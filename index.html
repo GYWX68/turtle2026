@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2026 灵龟献瑞 - 完美适配版</title>
+    <title>2026 灵龟献瑞 - 全屏交互版</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
     
     <script type="importmap">
@@ -19,20 +19,28 @@
         :root { --emerald: #00ffaa; --gold: #ffdf00; }
         body { margin: 0; overflow: hidden; background: #000; color: var(--gold); font-family: 'Cinzel', serif; }
         
-        #ui-layer { position: fixed; inset: 0; pointer-events: none; z-index: 10; padding: env(safe-area-inset-top) 20px 40px 20px; }
+        /* 交互 UI 层 */
+        #ui-layer { position: fixed; inset: 0; pointer-events: none; z-index: 10; padding: env(safe-area-inset-top) 20px 40px 20px; transition: opacity 0.5s; }
         
         .main-title { font-size: 2.2rem; margin: 0; filter: drop-shadow(0 0 10px var(--emerald)); color: #fff; text-align: center; margin-top: 10vh; letter-spacing: 4px;}
         .sub-title { font-size: 0.75rem; letter-spacing: 4px; opacity: 0.8; text-align: center; margin-top: 8px; color: var(--gold); }
 
+        /* 右上角功能按键 */
+        .top-right-btns { position: absolute; top: env(safe-area-inset-top); right: 20px; pointer-events: auto; display: flex; gap: 10px; z-index: 100; }
+        .glass-btn { 
+            background: rgba(255, 255, 255, 0.1); border: 1px solid var(--gold); color: var(--gold); 
+            padding: 8px 15px; font-size: 12px; cursor: pointer; backdrop-filter: blur(5px); border-radius: 4px;
+        }
+
         #video-container {
             position: absolute; bottom: 30px; right: 20px; width: 100px; height: 130px;
             border: 1px solid rgba(255, 223, 0, 0.3); border-radius: 8px; overflow: hidden;
-            transform: scaleX(-1); background: #111; pointer-events: auto;
+            transform: scaleX(-1); background: #111; pointer-events: auto; transition: opacity 0.5s;
         }
-        #webcam { width: 100%; height: 100%; object-fit: cover; opacity: 0.7; }
+        #webcam { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
 
         #start-mask {
-            position: fixed; inset: 0; background: #000; z-index: 100;
+            position: fixed; inset: 0; background: #000; z-index: 1000;
             display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
         }
         .start-btn {
@@ -47,18 +55,24 @@
 
     <div id="start-mask">
         <h2 style="color:white; font-weight: 400; letter-spacing: 3px;">2026 灵龟献瑞</h2>
-        <p style="color:var(--gold); font-size: 12px; margin-bottom: 30px; opacity: 0.7;">3D 手势互动贺卡</p>
+        <p style="color:var(--gold); font-size: 12px; margin-bottom: 30px; opacity: 0.7;">沉浸式 3D 手势交互</p>
         <button class="start-btn" onclick="startExperience()">开启体验</button>
     </div>
 
+    <div class="top-right-btns">
+        <button class="glass-btn" id="fs-btn" style="display:none;" onclick="toggleCinemaMode()">全屏模式</button>
+    </div>
+
     <div id="ui-layer">
-        <h1 class="main-title">HAPPY 2026</h1>
-        <h2 class="sub-title">祥瑞灵龟 · 岁岁平安</h2>
+        <div id="text-content">
+            <h1 class="main-title">HAPPY 2026</h1>
+            <h2 class="sub-title">祥瑞灵龟 · 岁岁平安</h2>
+        </div>
 
         <div id="video-container">
             <video id="webcam" autoplay playsinline></video>
         </div>
-        <div class="hint-text">移动手掌：操控旋转与俯仰 | 握拳：聚合</div>
+        <div id="bottom-hint" class="hint-text">握拳：聚合 | 移动：操控旋转俯仰</div>
     </div>
 
     <script type="module">
@@ -70,24 +84,47 @@
         let scene, camera, renderer, composer, clock;
         let particles, handLandmarker, video;
         let currentMode = 'TREE';
+        let isCinema = false;
         const count = 15000; 
 
-        // 核心修改 1：yOffset 设为 0 达到竖屏正中心
         const PARAMS = {
             yOffset: 0, 
             scatterSize: 25, 
             lerpSpeed: 0.012
         };
 
+        // 全屏模式切换逻辑
+        window.toggleCinemaMode = function() {
+            isCinema = !isCinema;
+            const ui = document.getElementById('text-content');
+            const videoCont = document.getElementById('video-container');
+            const hint = document.getElementById('bottom-hint');
+            const btn = document.getElementById('fs-btn');
+
+            if(isCinema) {
+                ui.style.opacity = "0";
+                videoCont.style.opacity = "0";
+                hint.style.opacity = "0";
+                btn.innerText = "退出全屏";
+                btn.style.background = "rgba(255,223,0,0.2)";
+            } else {
+                ui.style.opacity = "1";
+                videoCont.style.opacity = "1";
+                hint.style.opacity = "0.5";
+                btn.innerText = "全屏模式";
+                btn.style.background = "rgba(255,255,255,0.1)";
+            }
+        };
+
         window.startExperience = async function() {
             document.getElementById('start-mask').style.display = 'none';
+            document.getElementById('fs-btn').style.display = 'block';
             await init();
         }
 
         async function init() {
             clock = new THREE.Clock();
             scene = new THREE.Scene();
-            // 核心修改 2：相机位置微调
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
             camera.position.set(0, 0, 48);
 
@@ -123,13 +160,15 @@
             geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 
             particles = new THREE.Points(geo, new THREE.PointsMaterial({
-                size: 0.32, map: sprite, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false
+                size: 0.32, map: sprite, vertexColors: true, transparent: true, opacity: 0.85, // 降低基础亮度
+                blending: THREE.AdditiveBlending, depthWrite: false
             }));
             scene.add(particles);
 
             const composer_setup = new EffectComposer(renderer);
             composer_setup.addPass(new RenderPass(scene, camera));
-            composer_setup.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.1));
+            // 核心修改 2：亮度降低 20% (强度从 1.5 调至 1.2)
+            composer_setup.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.4, 0.1));
             composer = composer_setup;
 
             await setupCamera();
@@ -183,11 +222,11 @@
                     const pts = results.landmarks[0];
                     currentMode = (pts[12].y > pts[9].y) ? 'TREE' : 'SCATTER';
                     
-                    // 核心修改 3：增加上下摆动逻辑 (pts[8].y)
+                    // 核心修改 1：上下摇摆灵敏度提高 60% (1.0 -> 1.6)
                     const targetRotY = (pts[8].x - 0.5) * 1.5;
-                    const targetRotX = (pts[8].y - 0.5) * 1.0;
-                    particles.rotation.y += (targetRotY - particles.rotation.y) * 0.1;
-                    particles.rotation.x += (targetRotX - particles.rotation.x) * 0.1;
+                    const targetRotX = (pts[8].y - 0.5) * 1.6;
+                    particles.rotation.y += (targetRotY - particles.rotation.y) * 0.12;
+                    particles.rotation.x += (targetRotX - particles.rotation.x) * 0.12;
                 }
             }
 
@@ -215,6 +254,7 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
 </body>
