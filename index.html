@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2026 灵龟献瑞 - 镜头切换版</title>
+    <title>2026 灵龟献瑞 - 修复版</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
     
+    <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+    <script>var vConsole = new window.VConsole();</script>
+
     <script type="importmap">
         {
             "imports": {
@@ -18,36 +21,16 @@
     <style>
         :root { --emerald: #00ffaa; --gold: #ffdf00; }
         body { margin: 0; overflow: hidden; background: #000; color: var(--gold); font-family: 'Cinzel', serif; }
-        
         #ui-layer { position: fixed; inset: 0; pointer-events: none; z-index: 10; padding: env(safe-area-inset-top) 20px 40px 20px; transition: opacity 0.5s; }
-        
         .main-title { font-size: 2.2rem; margin: 0; filter: drop-shadow(0 0 10px var(--emerald)); color: #fff; text-align: center; margin-top: 10vh; letter-spacing: 4px;}
         .sub-title { font-size: 0.75rem; letter-spacing: 4px; opacity: 0.8; text-align: center; margin-top: 8px; color: var(--gold); }
-
         .top-right-btns { position: absolute; top: env(safe-area-inset-top); right: 20px; pointer-events: auto; display: flex; gap: 10px; z-index: 100; margin-top: 10px;}
-        .glass-btn { 
-            background: rgba(255, 255, 255, 0.1); border: 1px solid var(--gold); color: var(--gold); 
-            padding: 8px 15px; font-size: 12px; cursor: pointer; backdrop-filter: blur(5px); border-radius: 4px;
-        }
-
-        #video-container {
-            position: absolute; bottom: 30px; right: 20px; width: 100px; height: 130px;
-            border: 1px solid rgba(255, 223, 0, 0.3); border-radius: 8px; overflow: hidden;
-            background: #111; pointer-events: auto; transition: opacity 0.5s, transform 0.3s;
-        }
-        /* 初始为前置镜像状态 */
+        .glass-btn { background: rgba(255, 255, 255, 0.1); border: 1px solid var(--gold); color: var(--gold); padding: 8px 15px; font-size: 12px; cursor: pointer; backdrop-filter: blur(5px); border-radius: 4px; }
+        #video-container { position: absolute; bottom: 30px; right: 20px; width: 100px; height: 130px; border: 1px solid rgba(255, 223, 0, 0.3); border-radius: 8px; overflow: hidden; background: #111; pointer-events: auto; transition: opacity 0.5s, transform 0.3s; }
         .mirror { transform: scaleX(-1); }
         #webcam { width: 100%; height: 100%; object-fit: cover; opacity: 0.5; }
-
-        #start-mask {
-            position: fixed; inset: 0; background: #000; z-index: 1000;
-            display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
-        }
-        .start-btn {
-            background: none; border: 1px solid var(--gold); color: var(--gold);
-            padding: 12px 30px; font-size: 1rem; cursor: pointer; letter-spacing: 2px;
-        }
-        
+        #start-mask { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .start-btn { background: none; border: 1px solid var(--gold); color: var(--gold); padding: 12px 30px; font-size: 1rem; cursor: pointer; letter-spacing: 2px; }
         .hint-text { position: fixed; bottom: 40px; left: 0; width: 100%; text-align: center; font-size: 11px; opacity: 0.4; pointer-events: none; }
     </style>
 </head>
@@ -55,7 +38,7 @@
 
     <div id="start-mask">
         <h2 style="color:white; font-weight: 400; letter-spacing: 3px;">2026 灵龟献瑞</h2>
-        <p style="color:var(--gold); font-size: 12px; margin-bottom: 30px; opacity: 0.6;">极致灵敏手势交互</p>
+        <p style="color:var(--gold); font-size: 12px; margin-bottom: 30px; opacity: 0.6;">手势感应交互</p>
         <button class="start-btn" onclick="startExperience()">开启体验</button>
     </div>
 
@@ -69,11 +52,10 @@
             <h1 class="main-title">HAPPY 2026</h1>
             <h2 class="sub-title">祥瑞灵龟 · 岁岁平安</h2>
         </div>
-
         <div id="video-container" class="mirror">
-            <video id="webcam" autoplay playsinline></video>
+            <video id="webcam" autoplay playsinline muted></video>
         </div>
-        <div id="bottom-hint" class="hint-text">微动：全向旋转控制 | 握拳：聚合</div>
+        <div id="bottom-hint" class="hint-text">旋转：食指移动 | 聚合：握拳</div>
     </div>
 
     <script type="module">
@@ -86,48 +68,8 @@
         let particles, handLandmarker, video;
         let currentMode = 'TREE';
         let isCinema = false;
-        let currentFacingMode = 'user'; // 'user' 或 'environment'
-        const count = 15000; 
-
-        const PARAMS = {
-            yOffset: 0, 
-            scatterSize: 25, 
-            lerpSpeed: 0.012
-        };
-
-        window.toggleCinemaMode = function() {
-            isCinema = !isCinema;
-            const ui = document.getElementById('text-content');
-            const videoCont = document.getElementById('video-container');
-            const hint = document.getElementById('bottom-hint');
-            const btn = document.getElementById('fs-btn');
-
-            ui.style.opacity = isCinema ? "0" : "1";
-            videoCont.style.opacity = isCinema ? "0" : "1";
-            hint.style.opacity = isCinema ? "0" : "0.4";
-            btn.innerText = isCinema ? "退出全屏" : "全屏模式";
-        };
-
-        // 切换摄像头函数
-        window.toggleCamera = async function() {
-            currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
-            
-            // 停止当前视频流
-            if (video && video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-
-            // 更新 UI 镜像状态
-            const videoCont = document.getElementById('video-container');
-            if (currentFacingMode === 'user') {
-                videoCont.classList.add('mirror');
-            } else {
-                videoCont.classList.remove('mirror');
-            }
-
-            // 重新初始化摄像头
-            await setupCamera();
-        };
+        let currentFacingMode = 'user';
+        const count = 12000; 
 
         window.startExperience = async function() {
             document.getElementById('start-mask').style.display = 'none';
@@ -143,7 +85,7 @@
             camera.position.set(0, 0, 48);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
@@ -152,17 +94,14 @@
             const tar = new Float32Array(count * 3);
             const scat = new Float32Array(count * 3);
             const col = new Float32Array(count * 3);
-
             const sprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
 
             for(let i=0; i<count; i++) {
                 const end = getTurtlePoint(i);
                 pos[i*3]=0; pos[i*3+1]=0; pos[i*3+2]=0;
                 tar[i*3]=end.x; tar[i*3+1]=end.y; tar[i*3+2]=end.z;
-                
-                const scatDir = new THREE.Vector3().randomDirection().multiplyScalar(PARAMS.scatterSize);
+                const scatDir = new THREE.Vector3().randomDirection().multiplyScalar(25);
                 scat[i*3]=scatDir.x; scat[i*3+1]=scatDir.y; scat[i*3+2]=scatDir.z;
-
                 const isGold = Math.random() > 0.8;
                 const c = new THREE.Color(isGold ? 0xffdf00 : 0x00ffaa);
                 col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
@@ -174,19 +113,54 @@
             geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 
             particles = new THREE.Points(geo, new THREE.PointsMaterial({
-                size: 0.32, map: sprite, vertexColors: true, transparent: true, opacity: 0.65,
+                size: 0.35, map: sprite, vertexColors: true, transparent: true, opacity: 0.7,
                 blending: THREE.AdditiveBlending, depthWrite: false
             }));
             scene.add(particles);
 
-            const composer_setup = new EffectComposer(renderer);
-            composer_setup.addPass(new RenderPass(scene, camera));
-            composer_setup.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.77, 0.4, 0.1));
-            composer = composer_setup;
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.6, 0.4, 0.1));
 
             await setupCamera();
             await setupMediaPipe();
             animate();
+        }
+
+        async function setupCamera() {
+            video = document.getElementById('webcam');
+            const constraints = { 
+                video: { 
+                    facingMode: currentFacingMode,
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                } 
+            };
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                return new Promise(resolve => video.onloadedmetadata = resolve);
+            } catch (err) {
+                console.error("摄像头出错:", err);
+                alert("请在 HTTPS 环境下打开并允许摄像头访问");
+            }
+        }
+
+        async function setupMediaPipe() {
+            try {
+                const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0');
+                const fileset = await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+                handLandmarker = await vision.HandLandmarker.createFromOptions(fileset, {
+                    baseOptions: { 
+                        // 重要提示：建议将此模型文件下载到你的 GitHub 仓库根目录
+                        modelAssetPath: "hand_landmarker.task" 
+                    },
+                    runningMode: "VIDEO", numHands: 1
+                });
+                console.log("模型加载成功");
+            } catch (e) {
+                console.error("模型加载失败", e);
+            }
         }
 
         function getTurtlePoint(i) {
@@ -206,30 +180,7 @@
                 const side = Math.random() > 0.5 ? 1 : -1, front = Math.random() > 0.5 ? 1 : -1;
                 x = (9 + Math.random() * 5) * side; y = -1.5; z = (front > 0 ? 8 : -8) + Math.random() * 2;
             }
-            return { x, y: y + PARAMS.yOffset, z: z - 6 };
-        }
-
-        async function setupCamera() {
-            video = document.getElementById('webcam');
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: currentFacingMode } 
-                });
-                video.srcObject = stream;
-                return new Promise(resolve => video.onloadedmetadata = resolve);
-            } catch (err) {
-                console.error("无法访问摄像头: ", err);
-                alert("摄像头启动失败，请确保已授权并使用 HTTPS 访问。");
-            }
-        }
-
-        async function setupMediaPipe() {
-            const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0');
-            const fileset = await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
-            handLandmarker = await vision.HandLandmarker.createFromOptions(fileset, {
-                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" },
-                runningMode: "VIDEO", numHands: 1
-            });
+            return { x, y: y, z: z - 6 };
         }
 
         function animate() {
@@ -241,15 +192,11 @@
                 if (results.landmarks?.length > 0) {
                     const pts = results.landmarks[0];
                     currentMode = (pts[12].y > pts[9].y) ? 'TREE' : 'SCATTER';
-                    
-                    // 获取食指指尖位置 (pts[8])
-                    // 如果是后置摄像头，可能需要反转控制逻辑以符合手势方向
                     const factor = currentFacingMode === 'user' ? 1 : -1;
-                    const targetRotY = (pts[8].x - 0.5) * 3.51 * factor; 
-                    const targetRotX = (pts[8].y - 0.5) * 3.74;
-
-                    particles.rotation.y += (targetRotY - particles.rotation.y) * 0.15;
-                    particles.rotation.x += (targetRotX - particles.rotation.x) * 0.15;
+                    const targetRotY = (pts[8].x - 0.5) * 3.5 * factor; 
+                    const targetRotX = (pts[8].y - 0.5) * 3.5;
+                    particles.rotation.y += (targetRotY - particles.rotation.y) * 0.1;
+                    particles.rotation.x += (targetRotX - particles.rotation.x) * 0.1;
                 }
             }
 
@@ -259,19 +206,33 @@
 
             for(let i=0; i<count; i++) {
                 const idx = i*3;
-                if(currentMode === 'TREE') {
-                    pArr[idx] += (tArr[idx] - pArr[idx]) * 0.15;
-                    pArr[idx+1] += (tArr[idx+1] + Math.sin(time*2+i*0.1)*0.1 - pArr[idx+1]) * 0.15;
-                    pArr[idx+2] += (tArr[idx+2] - pArr[idx+2]) * 0.15;
-                } else {
-                    pArr[idx] += (sArr[idx] - pArr[idx]) * PARAMS.lerpSpeed;
-                    pArr[idx+1] += (sArr[idx+1] - pArr[idx+1]) * PARAMS.lerpSpeed;
-                    pArr[idx+2] += (sArr[idx+2] - pArr[idx+2]) * PARAMS.lerpSpeed;
-                }
+                const speed = currentMode === 'TREE' ? 0.12 : 0.02;
+                const targetX = currentMode === 'TREE' ? tArr[idx] : sArr[idx];
+                const targetY = currentMode === 'TREE' ? tArr[idx+1] + Math.sin(time*2+i*0.1)*0.1 : sArr[idx+1];
+                const targetZ = currentMode === 'TREE' ? tArr[idx+2] : sArr[idx+2];
+                
+                pArr[idx] += (targetX - pArr[idx]) * speed;
+                pArr[idx+1] += (targetY - pArr[idx+1]) * speed;
+                pArr[idx+2] += (targetZ - pArr[idx+2]) * speed;
             }
             particles.geometry.attributes.position.needsUpdate = true;
             composer.render();
         }
+
+        window.toggleCamera = async function() {
+            currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+            if (video && video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+            const vc = document.getElementById('video-container');
+            currentFacingMode === 'user' ? vc.classList.add('mirror') : vc.classList.remove('mirror');
+            await setupCamera();
+        };
+
+        window.toggleCinemaMode = function() {
+            isCinema = !isCinema;
+            document.getElementById('text-content').style.opacity = isCinema ? "0" : "1";
+            document.getElementById('video-container').style.opacity = isCinema ? "0" : "1";
+            document.getElementById('fs-btn').innerText = isCinema ? "退出" : "全屏";
+        };
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
